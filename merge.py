@@ -18,6 +18,5 @@ doc_info = pd.read_csv('train_nid_data_content_length', sep='\t', header=None, n
 
 #### 现在需要讲两者json 进来
 merge = pd.merge(data_train, doc_info, on='did', how='left')
-
 merge.to_csv('merge.csv', index =False, sep='\t')
 
