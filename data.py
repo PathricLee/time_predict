@@ -97,7 +97,7 @@ def read_online():
 def split_train_test():
     """
     """
-    all_data = pd.read_csv('train/merge.csv', sep='\t')
+    df = pd.read_csv('../train/merge.csv', sep='\t')
     start  = '2018-05-02 00:00:00'
     end = '2018-05-02 23:59:59'
     s, e = [int(time.mktime(time.strptime(x, "%Y-%m-%d %H:%M:%S"))) for x in [start, end]]
@@ -107,9 +107,12 @@ def split_train_test():
     test = df[df.time >= s]
     print("test shape: ", test.shape)
     #return pd.concat([train, test], axis = 0), train.shape[0]
-    train.to_csv('train/data/train.csv', sep='\t', index = False)
-    test.to_csv('train/data/test.csv', sep='\t', index = False)
+    train.to_csv('train/data/train.csv1', sep='\t', index = False, encoding='utf-8')
+    test.to_csv('train/data/test.csv1', sep='\t', index = False, encoding='utf-8')
+
+
 if __name__ == '__main__':
+    """
     if len(sys.argv) != 4:
         print("Usage: %s fun_name txt_input txt_output" % sys.argv[0])
         sys.exit(-1)
@@ -121,3 +124,5 @@ if __name__ == '__main__':
         fun(txt_input, txt_output)
     elif True:
         pass
+    """
+    split_train_test()
