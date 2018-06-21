@@ -13,7 +13,8 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error
 
-from keras.layers import Input, Conv1D, MaxPool1D, Dense, Activation, Flatten, concatenate, Subtract, Multiply, Embedding, Lambda,Dropout
+from keras.layers import Input, Conv1D, MaxPool1D, Dense, Activation,\
+         Flatten, concatenate, Subtract, Multiply, Embedding, Lambda,Dropout
 from keras import regularizers
 from keras.models import Model
 from keras import optimizers
@@ -36,9 +37,11 @@ def define_embedding(EMBEDDING_DIM, MAX_NB_WORDS, MAX_SEQUENCE_LENGTH, wei = Non
         wei: the initial weight
     """
     if wei is not None:
-        return Embedding(output_dim=EMBEDDING_DIM, input_dim=MAX_NB_WORDS, input_length=MAX_SEQUENCE_LENGTH, weights=[wei])
+        return Embedding(output_dim=EMBEDDING_DIM, input_dim=MAX_NB_WORDS,\
+                input_length=MAX_SEQUENCE_LENGTH, weights=[wei])
     else:
-        return Embedding(output_dim=EMBEDDING_DIM, input_dim=MAX_NB_WORDS, input_length=MAX_SEQUENCE_LENGTH, weights=wei)
+        return Embedding(output_dim=EMBEDDING_DIM, input_dim=MAX_NB_WORDS,\
+                input_length=MAX_SEQUENCE_LENGTH, weights=wei)
 
 def mean_bow(x, axis_):
     return K.mean(x, axis = axis_, keepdims = True)
@@ -76,10 +79,16 @@ def build_model(config, embed):
     # title
     title_input = Input(shape=(config[6][1], ), dtype='int32')
     title_embed = define_embedding(100, config[6][0]+1, config[6][1], embed[6])(title_input)
-    lambda_title = Lambda(mean_bow, output_shape=(1,100), arguments={'axis_':1})(title_embed)
-
+    #lambda_title = Lambda(mean_bow, output_shape=(1,100), arguments={'axis_':1})(title_embed)
     # flatten
     f = Flatten()
+
+    conv = Conv1D(32, 4, activation='tanh')
+    maxp = MaxPool1D(pool_size=4)
+    title_conv = conv(title_embed)
+    title_pool = maxp(title_conv)
+    lambda_title = f(title_pool)
+
     # activation
     a = Activation('softsign')
 
