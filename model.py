@@ -7,6 +7,7 @@ build model
 
 import sys
 import time
+import os
 
 import numpy as np
 import pandas as pd
@@ -34,45 +35,48 @@ def define_embedding(EMBEDDING_DIM, MAX_NB_WORDS, MAX_SEQUENCE_LENGTH, wei = Non
         input_length: how many words a time. often the max length
         wei: the initial weight
     """
-    return Embedding(output_dim=EMBEDDING_DIM, input_dim=MAX_NB_WORDS, input_length=MAX_SEQUENCE_LENGTH, weights=wei)
+    if wei is not None:
+        return Embedding(output_dim=EMBEDDING_DIM, input_dim=MAX_NB_WORDS, input_length=MAX_SEQUENCE_LENGTH, weights=[wei])
+    else:
+        return Embedding(output_dim=EMBEDDING_DIM, input_dim=MAX_NB_WORDS, input_length=MAX_SEQUENCE_LENGTH, weights=wei)
 
 def mean_bow(x, axis_):
     return K.mean(x, axis = axis_, keepdims = True)
 
-def build_model(config):
+def build_model(config, embed):
     """
         max_ele_len: size of feature space
     """
     #-----------------------model-------------------
     #uid
     uid_input = Input(shape=(config[0][1], ), dtype='int32')
-    uid_embed = define_embedding(128, config[0][0]+1, config[0][1])(uid_input)
+    uid_embed = define_embedding(128, config[0][0]+1, config[0][1], embed[0])(uid_input)
 
     #cate
     cate_input = Input(shape=(config[1][1], ), dtype='int32')
-    cate_embed = define_embedding(2, config[1][0]+1, config[1][1])(cate_input)
+    cate_embed = define_embedding(2, config[1][0]+1, config[1][1], embed[1])(cate_input)
 
     # tag1
     tag1_input = Input(shape=(config[2][1], ), dtype='int32')
-    tag1_embed = define_embedding(16, config[2][0]+1, config[2][1])(tag1_input)
+    tag1_embed = define_embedding(16, config[2][0]+1, config[2][1], embed[2])(tag1_input)
 
     # tag2
     tag2_input = Input(shape=(config[3][1], ), dtype='int32')
-    tag2_embed = define_embedding(64, config[3][0]+1, config[3][1])(tag2_input)
+    tag2_embed = define_embedding(64, config[3][0]+1, config[3][1], embed[3])(tag2_input)
 
     # author 
     author_input = Input(shape=(config[4][1], ), dtype='int32')
-    author_embed = define_embedding(128, config[4][0]+1, config[4][1])(author_input)
+    author_embed = define_embedding(128, config[4][0]+1, config[4][1], embed[4])(author_input)
 
     # key_word
     key_word_input = Input(shape=(config[5][1], ), dtype='int32')
-    key_word_embed = define_embedding(100, config[5][0]+1, config[5][1])(key_word_input)
+    key_word_embed = define_embedding(100, config[5][0]+1, config[5][1], embed[5])(key_word_input)
     lambda_lay = Lambda(mean_bow, output_shape=(1,100), arguments={'axis_':1})(key_word_embed)
 
     # title
-    #title_input = Input(shape=(config[6][1], ), dtype='int32')
-    #title_embed = define_embedding(100, config[6][0], config[6][1])(title_input)
-    #lambda_title = Lambda(mean_bow, output_shape=(1,100), arguments={'axis_':1})(title_embed)
+    title_input = Input(shape=(config[6][1], ), dtype='int32')
+    title_embed = define_embedding(100, config[6][0]+1, config[6][1], embed[6])(title_input)
+    lambda_title = Lambda(mean_bow, output_shape=(1,100), arguments={'axis_':1})(title_embed)
 
     # flatten
     f = Flatten()
@@ -86,16 +90,15 @@ def build_model(config):
     doc_den = Dense(units=128, activation='relu', kernel_regularizer=regularizers.l2(0.01))(act1)
 
     # conbine 
-    #concat2 = concatenate([f(uid_embed), doc_den, f(lambda_title)])
-    concat2 = concatenate([f(uid_embed), doc_den])
+    concat2 = concatenate([f(uid_embed), doc_den, f(lambda_title)])
     act2 = a(concat2)
     den1 = Dense(units=30, activation='relu', kernel_regularizer=regularizers.l2(0.01))(act2)
     den2 = Dense(units=5, activation='softmax', kernel_regularizer=regularizers.l2(0.01))(den1)
 
-    #model = Model(inputs=[uid_input, cate_input, tag1_input, tag2_input, author_input,\
-    #            key_word_input, title_input], outputs=den2)
     model = Model(inputs=[uid_input, cate_input, tag1_input, tag2_input, author_input,\
-            key_word_input], outputs=den2)
+            key_word_input, title_input], outputs=den2)
+    #model = Model(inputs=[uid_input, cate_input, tag1_input, tag2_input, author_input,\
+    #            key_word_input], outputs=den2)
 
     model.compile(loss='categorical_crossentropy', optimizer=optimizers.RMSprop(lr=1e-4), metrics=['acc'])
 
@@ -124,26 +127,41 @@ def load_feature(used_fea, name, load_label):
         return ret, label
     return ret
 
+def load_embed(used_fea):
+    ret = []
+    for fea in used_fea:
+        fname = 'train/embed/%s2vec' % (fea)
+        if os.path.exists(fname):
+            data = np.loadtxt(fname, dtype=np.float32, ndmin=2)
+            print(fea, data.shape)
+            ret.append(data)
+        else:
+            ret.append(None)
+    return ret
 
 
 if __name__ == '__main__':
     # ------------------------------data------------------------------------------
     # all train data
-    used_fea = ['cid','cate','tag1','tag2', 'author', 'key_word']
-    x_online = load_feature(used_fea, 'online', False)
-    x_test, y_test = load_feature(used_fea, 'test', True)
+    used_fea = ['cid','cate','tag1','tag2', 'author', 'key_word', 'title']
+    embed = load_embed(used_fea)
+    print('load train')
     x_train, y_train = load_feature(used_fea, 'train', True)
+    print('load test')
+    x_test, y_test = load_feature(used_fea, 'test', True)
+    print('load online')
+    x_online = load_feature(used_fea, 'online', False)
     config = np.loadtxt('config', dtype=np.int32)
-    model = build_model(config)
+    model = build_model(config, embed)
     #-------------------------model/train/test/save---------------------------------------
 
     #history
     history = LossHistory()
     # train
-    model = build_model(config)
-    model.fit(x_train, y_train, epochs=8, batch_size=516,\
+    model.fit(x_train, y_train, epochs=15, batch_size=516,\
             validation_data=(x_test, y_test),\
             callbacks=[history])
+    model.save('20c.h5I1')
 
     score = model.evaluate(x_test, y_test, verbose=0)
     print('Test score:', score[0])
@@ -160,8 +178,10 @@ if __name__ == '__main__':
     y_acc_train = model.predict(x_train, verbose=0, batch_size=516)
     cal_acc(y_acc_train, y_train, 'predict_train,csv')
 
+    print("Online predict")
     y_predict = model.predict(x_online, verbose=0, batch_size=516)
     y_predict_label = np.argmax(y_predict, axis=1) + 1
+    raw_test_data = pd.read_csv('../test/merge.csv', sep='\t')
     y_index = raw_test_data[['cid', 'did']]
     # y_index['label'] = y_predict_label
     y_index.insert(y_index.shape[1], 'label', y_predict_label)
